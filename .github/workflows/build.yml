@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK From Zip
 on:
   push:
     branches: [ main, master ]
@@ -20,38 +20,65 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Unzip Project
+      - name: Unzip and Generate Manifest
         run: |
-          if [ -f fObywatel-main.zip ]; then
-            unzip fObywatel-main.zip
-            PROJECT_DIR="fObywatel-main"
-          elif [ -f ai_studio_code.zip ]; then
-            unzip ai_studio_code.zip
-            PROJECT_DIR="ai_studio_code"
-          else
-            PROJECT_DIR="."
+          # 1. Rozpakowanie Twojego pliku zip
+          unzip fObywatel-main.zip
+          
+          # 2. Wejście do folderu projektu (jeśli istnieje)
+          if [ -d "fObywatel-main" ]; then
+            cd fObywatel-main
           fi
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          
+          # 3. Upewniamy się, że folder na manifest istnieje
+          mkdir -p android/app/src/main
+          
+          # 4. Automatyczne stworzenie czystego pliku AndroidManifest.xml od zera
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.mobywatel">
 
-      - name: Install Dependencies
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          if [ -f ../App.js ]; then
-            cp ../App.js ./App.js || cp ../App.js ./src/App.js || true
-          fi
+              <uses-permission android:name="android:permission.INTERNET" />
+              <uses-permission android:name="android:permission.SYSTEM_ALERT_WINDOW"/>
+
+              <application
+                android:name=".MainApplication"
+                android:label="mObywatel"
+                android:icon="@mipmap/ic_launcher"
+                android:roundIcon="@mipmap/ic_launcher_round"
+                android:allowBackup="false"
+                android:theme="@style/AppTheme">
+                
+                <activity
+                  android:name=".MainActivity"
+                  android:label="mObywatel"
+                  android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|styleSheets"
+                  android:launchMode="singleTask"
+                  android:windowSoftInputMode="adjustResize"
+                  android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.intent.action.MAIN" />
+                      <category android:name="android.intent.category.LAUNCHER" />
+                  </intent-filter>
+                </activity>
+              </application>
+          </manifest>
+          EOF
+          
+          echo "Plik AndroidManifest.xml został automatycznie wygenerowany!"
+          
+          # 5. Instalacja bibliotek node_modules
           npm install --legacy-peer-deps
-
-      - name: Manual Bundle Generation
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res || true
 
       - name: Build Release APK
         run: |
-          cd ${{ env.PROJECT_DIR }}
+          if [ -d "fObywatel-main" ]; then
+            cd fObywatel-main
+          fi
+          # Szukanie folderu z plikiem gradlew i kompilacja APK
           TARGET_DIR=$(find . -name "gradlew" -exec dirname {} \;)
           cd $TARGET_DIR
+          
           chmod +x gradlew
           ./gradlew assembleRelease
 
