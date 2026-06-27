@@ -20,15 +20,38 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Create React Native Project
+      - name: Unzip Project
         run: |
-          npx @react-native-community/cli@latest init MojaApka --skip-install --pm npm
-          cp App.js MojaApka/App.js
-          cd MojaApka && npm install
+          if [ -f fObywatel-main.zip ]; then
+            unzip fObywatel-main.zip
+            PROJECT_DIR="fObywatel-main"
+          elif [ -f ai_studio_code.zip ]; then
+            unzip ai_studio_code.zip
+            PROJECT_DIR="ai_studio_code"
+          else
+            PROJECT_DIR="."
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Install Dependencies
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          if [ -f ../App.js ]; then
+            cp ../App.js ./App.js || cp ../App.js ./src/App.js || true
+          fi
+          npm install --legacy-peer-deps
+
+      - name: Manual Bundle Generation
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res || true
 
       - name: Build Release APK
         run: |
-          cd MojaApka/android
+          cd ${{ env.PROJECT_DIR }}
+          TARGET_DIR=$(find . -name "gradlew" -exec dirname {} \;)
+          cd $TARGET_DIR
           chmod +x gradlew
           ./gradlew assembleRelease
 
@@ -36,5 +59,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mobywatel-apk
-          path: MojaApka/android/app/build/outputs/apk/release/app-release.apk
+          path: "**/build/outputs/apk/release/*-release.apk"
           
