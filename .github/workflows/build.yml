@@ -20,20 +20,26 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Unzip and Generate Manifest
+      - name: Unzip and Find Project Root
         run: |
-          # 1. Rozpakowanie Twojego pliku zip
+          # 1. Rozpakowanie pliku zip
           unzip fObywatel-main.zip
           
-          # 2. Wejście do folderu projektu (jeśli istnieje)
-          if [ -d "fObywatel-main" ]; then
-            cd fObywatel-main
-          fi
+          # 2. Dynamiczne szukanie gdzie jest plik package.json
+          PACKAGE_PATH=$(find . -name "package.json" | head -n 1)
+          PROJECT_ROOT=$(dirname "$PACKAGE_PATH")
           
-          # 3. Upewniamy się, że folder na manifest istnieje
+          echo "Znaleziono katalog główny projektu: $PROJECT_ROOT"
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
+
+      - name: Generate Manifest Automatically
+        run: |
+          cd ${{ env.PROJECT_ROOT }}
+          
+          # Upewniamy się, że ścieżka na manifest istnieje
           mkdir -p android/app/src/main
           
-          # 4. Automatyczne stworzenie czystego pliku AndroidManifest.xml od zera
+          # Tworzenie pliku AndroidManifest.xml od zera
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.mobywatel">
@@ -65,16 +71,16 @@ jobs:
           </manifest>
           EOF
           
-          echo "Plik AndroidManifest.xml został automatycznie wygenerowany!"
-          
-          # 5. Instalacja bibliotek node_modules
+          echo "Plik AndroidManifest.xml został pomyślnie wygenerowany!"
+
+      - name: Install Dependencies
+        run: |
+          cd ${{ env.PROJECT_ROOT }}
           npm install --legacy-peer-deps
 
       - name: Build Release APK
         run: |
-          if [ -d "fObywatel-main" ]; then
-            cd fObywatel-main
-          fi
+          cd ${{ env.PROJECT_ROOT }}
           # Szukanie folderu z plikiem gradlew i kompilacja APK
           TARGET_DIR=$(find . -name "gradlew" -exec dirname {} \;)
           cd $TARGET_DIR
@@ -87,4 +93,4 @@ jobs:
         with:
           name: mobywatel-apk
           path: "**/build/outputs/apk/release/*-release.apk"
-          
+        
